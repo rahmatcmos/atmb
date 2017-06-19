@@ -1,0 +1,199 @@
+from pyA20.gpio import gpio, port
+import time
+
+
+class Jajal:
+    def __init__(self):
+        gpio.init()
+
+        # SEBAGAI INPUT
+        self.LS_KATUP_ATAS_BUKA = port.PA13
+        self.LS_KATUP_ATAS_TUTUP = port.PA14
+        self.LS_KATUP_BAWAH_BUKA = port.PD14
+        self.LS_KATUP_BAWAH_TUTUP = port.PC4
+        self.LS_BAKI_BAWAH = port.PC7
+        self.LS_BAKI_ATAS = port.PA2
+
+        # SEBAGAI OUTPUT
+        self.MOTOR_KATUP_ATAS = port.PA6
+        self.ARAH_MOTOR_KATUP_ATAS = port.PA1
+        self.MOTOR_KATUP_BAWAH = port.PA0
+        self.ARAH_MOTOR_KATUP_BAWAH = port.PA3
+        self.MOTOR_BAKI = port.PC0
+        self.ARAH_MOTOR_BAKI = port.PC1
+
+        gpio.setcfg(self.LS_KATUP_ATAS_BUKA, gpio.INPUT)
+        gpio.setcfg(self.LS_KATUP_ATAS_TUTUP, gpio.INPUT)
+        gpio.setcfg(self.LS_KATUP_BAWAH_BUKA, gpio.INPUT)
+        gpio.setcfg(self.LS_KATUP_BAWAH_TUTUP, gpio.INPUT)
+        gpio.setcfg(self.LS_BAKI_BAWAH, gpio.INPUT)
+        gpio.setcfg(self.LS_BAKI_ATAS, gpio.INPUT)
+
+        gpio.pullup(self.LS_KATUP_ATAS_BUKA, gpio.PULLUP)
+        gpio.pullup(self.LS_KATUP_ATAS_TUTUP, gpio.PULLUP)
+        gpio.pullup(self.LS_KATUP_BAWAH_BUKA, gpio.PULLUP)
+        gpio.pullup(self.LS_KATUP_BAWAH_TUTUP, gpio.PULLUP)
+        gpio.pullup(self.LS_BAKI_BAWAH, gpio.PULLUP)
+        gpio.pullup(self.LS_BAKI_ATAS, gpio.PULLUP)
+
+        gpio.setcfg(self.MOTOR_KATUP_ATAS, gpio.OUTPUT)
+        gpio.setcfg(self.ARAH_MOTOR_KATUP_ATAS, gpio.OUTPUT)
+        gpio.setcfg(self.MOTOR_KATUP_BAWAH, gpio.OUTPUT)
+        gpio.setcfg(self.ARAH_MOTOR_KATUP_BAWAH, gpio.OUTPUT)
+        gpio.setcfg(self.MOTOR_BAKI, gpio.OUTPUT)
+        gpio.setcfg(self.ARAH_MOTOR_BAKI, gpio.OUTPUT)
+
+        # reset output ke low semua (just to ensure)
+        gpio.output(self.MOTOR_KATUP_ATAS, gpio.LOW)
+        gpio.output(self.ARAH_MOTOR_KATUP_ATAS, gpio.LOW)
+        gpio.output(self.MOTOR_KATUP_BAWAH, gpio.LOW)
+        gpio.output(self.ARAH_MOTOR_KATUP_BAWAH, gpio.LOW)
+        gpio.output(self.MOTOR_BAKI, gpio.LOW)
+        gpio.output(self.ARAH_MOTOR_BAKI, gpio.LOW)
+
+    def naikkan_baki(self):
+        if gpio.input(self.LS_BAKI_ATAS) == 0:
+            return
+        try:
+            gpio.output(self.MOTOR_BAKI, gpio.HIGH)
+            time.sleep(0.05)
+            while gpio.input(self.LS_BAKI_ATAS) == 1:
+                pass
+            time.sleep(1.2)
+            gpio.output(self.MOTOR_BAKI, gpio.LOW)
+            time.sleep(2.3)
+            gpio.output(self.MOTOR_BAKI, gpio.HIGH)
+            time.sleep(0.05)
+            gpio.output(self.MOTOR_BAKI, gpio.LOW)
+        except KeyboardInterrupt:
+            gpio.output(self.MOTOR_BAKI, gpio.LOW)
+
+    def tutup_katup_atas(self):
+        if gpio.input(self.LS_KATUP_ATAS_BUKA) == 0:
+            return
+        gpio.output(self.ARAH_MOTOR_KATUP_ATAS, gpio.HIGH)
+        time.sleep(0.5)
+        try:
+            gpio.output(self.MOTOR_KATUP_ATAS, gpio.HIGH)
+            time.sleep(0.49)
+            # while gpio.input(self.LS_KATUP_ATAS_BUKA) == 1:
+            #     pass
+            gpio.output(self.MOTOR_KATUP_ATAS, gpio.LOW)
+            gpio.output(self.ARAH_MOTOR_KATUP_ATAS, gpio.LOW)
+        except KeyboardInterrupt:
+            gpio.output(self.ARAH_MOTOR_KATUP_ATAS, gpio.LOW)
+            gpio.output(self.MOTOR_KATUP_ATAS, gpio.LOW)
+
+    def buka_katup_atas(self):
+        if gpio.input(self.LS_KATUP_ATAS_TUTUP) == 0:
+            return
+        gpio.output(self.ARAH_MOTOR_KATUP_ATAS, gpio.LOW)
+        time.sleep(0.5)
+        try:
+            gpio.output(self.MOTOR_KATUP_ATAS, gpio.HIGH)
+            time.sleep(0.05)
+            while gpio.input(self.LS_KATUP_ATAS_TUTUP) == 1:
+                pass
+            gpio.output(self.MOTOR_KATUP_ATAS, gpio.LOW)
+        except KeyboardInterrupt:
+            gpio.output(self.MOTOR_KATUP_ATAS, gpio.LOW)
+
+    def tutup_katup_bawah(self):
+        if gpio.input(self.LS_KATUP_BAWAH_BUKA) == 0:
+            return
+        gpio.output(self.ARAH_MOTOR_KATUP_BAWAH, gpio.HIGH)
+        time.sleep(0.5)
+        try:
+            gpio.output(self.MOTOR_KATUP_BAWAH, gpio.HIGH)
+            time.sleep(0.6)
+            gpio.output(self.MOTOR_KATUP_BAWAH, gpio.LOW)
+            gpio.output(self.ARAH_MOTOR_KATUP_BAWAH, gpio.LOW)
+        except KeyboardInterrupt:
+            gpio.output(self.ARAH_MOTOR_KATUP_BAWAH, gpio.LOW)
+            gpio.output(self.MOTOR_KATUP_BAWAH, gpio.LOW)
+
+    def buka_katup_bawah(self):
+        if gpio.input(self.LS_KATUP_BAWAH_TUTUP) == 0:
+            return
+        gpio.output(self.ARAH_MOTOR_KATUP_BAWAH, gpio.LOW)
+        time.sleep(0.5)
+        try:
+            gpio.output(self.MOTOR_KATUP_BAWAH, gpio.HIGH)
+            time.sleep(0.05)
+            while gpio.input(self.LS_KATUP_BAWAH_TUTUP) == 1:
+                pass
+            gpio.output(self.MOTOR_KATUP_BAWAH, gpio.LOW)
+        except KeyboardInterrupt:
+            gpio.output(self.MOTOR_KATUP_BAWAH, gpio.LOW)
+
+    def maju_mundur_atas(self):
+        while True:
+            self.buka_katup_atas()
+            time.sleep(1)
+            self.tutup_katup_atas()
+            time.sleep(1)
+
+    def maju_mundur_bawah(self):
+        while True:
+            self.buka_katup_bawah()
+            time.sleep(1)
+            self.tutup_katup_bawah()
+            time.sleep(1)
+
+    def simulasi_ambil(self, jumlah):
+        for i in range(jumlah):
+            self.buka_katup_atas()
+            time.sleep(2)
+            self.tutup_katup_atas()
+            time.sleep(0.5)
+            self.buka_katup_bawah()
+            time.sleep(1)
+            self.tutup_katup_bawah()
+            time.sleep(5)
+
+        self.naikkan_baki()
+        # turun sendiri
+
+
+
+if __name__ == "__main__":
+    jajal = Jajal()
+    print "1. Buka katup atas (Mundur)"
+    print "2. Tutup katup atas (Maju)"
+    print "3. Buka katup bawah (Mundur)"
+    print "4. Tutup katup bawah (Maju)"
+    print "5. Naikkan baki"
+    print "6. Maju mundur atas"
+    print "7. Maju mundur bawah"
+    print "8. Simulasi ambil 1 liter"
+    print "9. Simulasi ambil 2 liter"
+
+    yang_ditest = raw_input("Pilih yang mau ditest:")
+    yang_ditest = int(yang_ditest)
+
+    if yang_ditest == 1:
+        jajal.buka_katup_atas()
+
+    if yang_ditest == 2:
+        jajal.tutup_katup_atas()
+
+    if yang_ditest == 3:
+        jajal.buka_katup_bawah()
+
+    if yang_ditest == 4:
+        jajal.tutup_katup_bawah()
+
+    if yang_ditest == 5:
+        jajal.naikkan_baki()
+
+    if yang_ditest == 6:
+        jajal.maju_mundur_atas()
+
+    if yang_ditest == 7:
+        jajal.maju_mundur_bawah()
+
+    if yang_ditest == 8:
+        jajal.simulasi_ambil(1)
+
+    if yang_ditest == 9:
+        jajal.simulasi_ambil(2)
