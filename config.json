@@ -1,0 +1,28 @@
+{
+    "id": 6,
+    "scale": 3,
+    "api_url": "http://http://114.6.180.156/atmb/api/",
+    "device": {
+        "nfc": "/dev/serial4"
+    },
+    "db": {
+        "driver": "mysql",
+        "host": "localhost",
+        "port": 3306,
+        "user": "root",
+        "pass": "bismillah",
+        "name": "atmb",
+        "key": "F3229A0B371ED2D9441B830D21A390C3"
+    },
+    "gpio_pin": {
+        "motor_direction": 16,
+        "motor_on": 18,
+        "keypad_row": [31, 33, 35, 37],
+        "keypad_col": [36, 38, 40]
+    },
+    "timer_calibartion": {
+        "open": 20,
+        "close": 21,
+        "wait": 3
+    }
+}

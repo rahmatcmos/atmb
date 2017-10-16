@@ -86,6 +86,6 @@ class Ui_Form(object):
         Form.setWindowTitle(_translate("Form", "UBAH PIN", None))
         self.info.setText(_translate("Form", "MASUKKAN PIN BARU ANDA", None))
         self.pin.setText(_translate("Form", "----", None))
-        self.ulangi_btn.setText(_translate("Form", "[BACK] ULANGI", None))
-        self.kembali_btn.setText(_translate("Form", "[ENTER] KEMBALI ", None))
+        self.ulangi_btn.setText(_translate("Form", "[*] ULANGI", None))
+        self.kembali_btn.setText(_translate("Form", "[#] KEMBALI ", None))
 

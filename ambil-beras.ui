@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>751</width>
+    <width>782</width>
     <height>605</height>
    </rect>
   </property>
@@ -73,7 +73,7 @@
         </font>
        </property>
        <property name="text">
-        <string>[BACK] KEMBALI</string>
+        <string>[*] KEMBALI</string>
        </property>
       </widget>
      </item>
@@ -85,7 +85,7 @@
         </font>
        </property>
        <property name="text">
-        <string>[ENTER] SELESAI</string>
+        <string>[#] SELESAI</string>
        </property>
       </widget>
      </item>

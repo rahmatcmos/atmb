@@ -55,7 +55,6 @@ class Main(QtGui.QWidget, main_ui.Ui_main):
         self.keypad_thread.start()
         self.showFullScreen()
 
-    # buat development aja. nanti pake kombinasi key
     def keypad_pressed_event(self, key):
         self.password += str(key)
 

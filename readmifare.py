@@ -30,7 +30,7 @@ import PN532
 
 
 # Create an instance of the PN532 class.
-pn532 = PN532.PN532("/dev/ttyUSB0",115200)
+pn532 = PN532.PN532("/dev/serial2",115200)
 
 # Call begin to initialize communication with the PN532.  Must be done before
 # any other calls to the PN532!

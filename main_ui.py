@@ -25,7 +25,7 @@ except AttributeError:
 class Ui_main(object):
     def setupUi(self, main):
         main.setObjectName(_fromUtf8("main"))
-        main.resize(952, 796)
+        main.resize(998, 796)
         self.horizontalLayout = QtGui.QHBoxLayout(main)
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         self.verticalLayout_2 = QtGui.QVBoxLayout()
@@ -55,7 +55,7 @@ class Ui_main(object):
         self.verticalLayout_2.addWidget(self.label_4)
         self.logo = QtGui.QLabel(main)
         self.logo.setText(_fromUtf8(""))
-        self.logo.setPixmap(QtGui.QPixmap(_fromUtf8("/root/Desktop/ATM_BERAS/logo.png")))
+        self.logo.setPixmap(QtGui.QPixmap(_fromUtf8("/home/pi/ATMB/logo.png")))
         self.logo.setAlignment(QtCore.Qt.AlignCenter)
         self.logo.setObjectName(_fromUtf8("logo"))
         self.verticalLayout_2.addWidget(self.logo)
@@ -116,10 +116,10 @@ class Ui_main(object):
     def retranslateUi(self, main):
         main.setWindowTitle(_translate("main", "ATM BERAS", None))
         self.label_2.setText(_translate("main", "SAMPURASUN", None))
-        self.label_3.setText(_translate("main", "Wilujeng Sumping", None))
-        self.label_4.setText(_translate("main", "di Bank Perelek", None))
+        self.label_3.setText(_translate("main", "Wilujeung Sumping", None))
+        self.label_4.setText(_translate("main", "di Bang Perelek", None))
         self.label.setText(_translate("main", "KABUPATEN PURWAKARTA", None))
-        self.tanggal.setText(_translate("main", "", None))
-        self.jam.setText(_translate("main", "", None))
+        self.tanggal.setText(_translate("main", "tanggal", None))
+        self.jam.setText(_translate("main", "jam", None))
         self.info.setText(_translate("main", "INFO", None))
 

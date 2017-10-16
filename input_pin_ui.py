@@ -25,7 +25,7 @@ except AttributeError:
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName(_fromUtf8("Form"))
-        Form.resize(725, 493)
+        Form.resize(772, 493)
         self.horizontalLayout = QtGui.QHBoxLayout(Form)
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
@@ -85,6 +85,6 @@ class Ui_Form(object):
         Form.setWindowTitle(_translate("Form", "INPUT PIN", None))
         self.info.setText(_translate("Form", "SILAKAN MASUKKAN PIN ANDA", None))
         self.pin.setText(_translate("Form", "----", None))
-        self.ulangi_btn.setText(_translate("Form", " [BACK] ULANGI", None))
-        self.selesai_btn.setText(_translate("Form", " [ENTER] KELUAR", None))
+        self.ulangi_btn.setText(_translate("Form", " [*] ULANGI", None))
+        self.selesai_btn.setText(_translate("Form", " [#] KELUAR", None))
 

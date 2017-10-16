@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>725</width>
+    <width>772</width>
     <height>493</height>
    </rect>
   </property>
@@ -120,7 +120,7 @@
          </font>
         </property>
         <property name="text">
-         <string> [BACK] ULANGI</string>
+         <string> [*] ULANGI</string>
         </property>
        </widget>
        <widget class="QPushButton" name="selesai_btn">
@@ -130,7 +130,7 @@
          </font>
         </property>
         <property name="text">
-         <string> [ENTER] KELUAR</string>
+         <string> [#] KELUAR</string>
         </property>
        </widget>
       </widget>

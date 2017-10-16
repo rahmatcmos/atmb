@@ -25,7 +25,7 @@ except AttributeError:
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName(_fromUtf8("Form"))
-        Form.resize(751, 605)
+        Form.resize(782, 605)
         self.gridLayout = QtGui.QGridLayout(Form)
         self.gridLayout.setObjectName(_fromUtf8("gridLayout"))
         spacerItem = QtGui.QSpacerItem(20, 40, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
@@ -104,8 +104,8 @@ class Ui_Form(object):
     def retranslateUi(self, Form):
         Form.setWindowTitle(_translate("Form", "AMBIL BERAS", None))
         self.info.setText(_translate("Form", "INFO", None))
-        self.kembali_btn.setText(_translate("Form", "[BACK] KEMBALI", None))
-        self.selesai_btn.setText(_translate("Form", "[ENTER] SELESAI", None))
+        self.kembali_btn.setText(_translate("Form", "[*] KEMBALI", None))
+        self.selesai_btn.setText(_translate("Form", "[#] SELESAI", None))
         self.dua_liter.setText(_translate("Form", "[2] 2 LITER", None))
         self.satu_liter.setText(_translate("Form", "[1] 1 LITER", None))
         self.label.setText(_translate("Form", "SILAKAN PILIH JUMLAH YANG AKAN ANDA AMBIL", None))

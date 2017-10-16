@@ -120,7 +120,7 @@
          <string notr="true"/>
         </property>
         <property name="text">
-         <string>[BACK] ULANGI</string>
+         <string>[*] ULANGI</string>
         </property>
        </widget>
        <widget class="QPushButton" name="kembali_btn">
@@ -133,7 +133,7 @@
          <string notr="true"/>
         </property>
         <property name="text">
-         <string>[ENTER] KEMBALI </string>
+         <string>[#] KEMBALI </string>
         </property>
        </widget>
       </widget>

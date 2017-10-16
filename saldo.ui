@@ -94,64 +94,6 @@
       </widget>
      </item>
      <item>
-      <spacer name="verticalSpacer_2">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>40</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="ambil_beras_btn">
-       <property name="font">
-        <font>
-         <pointsize>30</pointsize>
-        </font>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">text-align:left;</string>
-       </property>
-       <property name="text">
-        <string>  [1] AMBIL BERAS</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="kembali_btn">
-       <property name="font">
-        <font>
-         <pointsize>30</pointsize>
-        </font>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">text-align:left;</string>
-       </property>
-       <property name="text">
-        <string>  [2] KEMBALI</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="selesai_btn">
-       <property name="font">
-        <font>
-         <pointsize>30</pointsize>
-        </font>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">text-align:left;</string>
-       </property>
-       <property name="text">
-        <string>  [3] SELESAI</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
