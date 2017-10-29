@@ -1,9 +1,10 @@
 {
     "id": 6,
-    "scale": 3,
+    "selection": [3],
+    "log_level": "DEBUG",
     "api_url": "http://http://114.6.180.156/atmb/api/",
     "device": {
-        "nfc": "/dev/serial4"
+        "nfc": "/dev/serial5"
     },
     "db": {
         "driver": "mysql",

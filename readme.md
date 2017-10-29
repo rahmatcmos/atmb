@@ -48,5 +48,5 @@ $ crontab -e
 ```
 Tambahkan baris berikut
 ```
-mysql -u[user] -p[password] atmb -e "update nasabah set saldo = 15"
+@monthly mysql -u[user] -p[password] atmb -e "update nasabah set saldo = 15"
 ```
