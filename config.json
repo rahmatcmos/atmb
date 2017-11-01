@@ -1,19 +1,17 @@
 {
     "id": 6,
+    "kode_kecamatan": "101",
+    "kode_kelurahan": "001",
+    "kode_atm": "001",
     "selection": [3],
     "log_level": "DEBUG",
-    "api_url": "http://http://114.6.180.156/atmb/api/",
+    "api_url": "http://http://114.6.180.154/atmb/api/",
     "device": {
         "nfc": "/dev/serial5"
     },
     "db": {
-        "driver": "mysql",
-        "host": "localhost",
-        "port": 3306,
-        "user": "root",
-        "pass": "bismillah",
-        "name": "atmb",
-        "key": "F3229A0B371ED2D9441B830D21A390C3"
+        "driver": "sqlite",
+        "name": "atmb.db",
     },
     "gpio_pin": {
         "motor_direction": 16,
@@ -21,7 +19,7 @@
         "keypad_row": [31, 33, 35, 37],
         "keypad_col": [36, 38, 40]
     },
-    "timer_calibartion": {
+    "timer_calibration": {
         "open": 20,
         "close": 21,
         "wait": 3
