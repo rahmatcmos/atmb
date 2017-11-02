@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 from PyQt4 import QtCore, QtGui
 import main_ui
 import menu_ui
@@ -17,57 +18,11 @@ import sqlite3
 import subprocess
 import requests
 import json
-import os.path
+import os
 import logging
 import logging.handlers
-from threading import Thread
 from pygame import mixer
 
-
-class Database:
-    def __init__(self):
-        self.host = config["db"]["host"]
-        self.username = config["db"]["user"]
-        self.password = config["db"]["pass"]
-        self.name = config["db"]["name"]
-        self.con = None
-        self.cur = None
-
-    def connect(self):
-        if self.con == None:
-            self.con = MySQLdb.connect(
-                host=self.host,
-                user=self.username,
-                passwd=self.password,
-                db=self.name
-            )
-        return self.con
-
-    def query(self, query, param=None):
-        self.con = self.connect()
-        self.cur = self.con.cursor()
-        self.cur.execute(query, param)
-        return self.cur
-
-    def fetchone():
-        result = self.cur.fetchone()
-        self.cur.close()
-        self.con.close()
-        return result
-
-    def fetchall():
-        result = self.cur.fetchall()
-        self.cur.close()
-        self.con.close()
-        return result
-
-    def save(self, query, param=None):
-        self.con = self.connect()
-        cur = self.con.cursor()
-        cur.execute(query, param)
-        cur.close()
-        self.con.commit()
-        self.con.close()
 
 class Main(QtGui.QWidget, main_ui.Ui_main):
     def __init__(self):
@@ -183,16 +138,13 @@ class InputPin(QtGui.QWidget, input_pin_ui.Ui_Form):
         if len(self.entered_pin) == 4:
             logger.debug("Nasabah ID: " + str(self.nasabah[0]) + ", PIN: " + self.entered_pin)
 
-            db = Database()
-            con = db.connect()
-            cur = con.cursor()
+            cur = db.cursor()
             cur.execute(
-                "SELECT * FROM nasabah where id = %s AND pin = AES_ENCRYPT(%s, UNHEX(%s))",
-                (self.nasabah[0], self.entered_pin, config["db"]["key"])
+                "SELECT * FROM nasabah where id = ? AND pin = ?",
+                (self.nasabah[0], self.entered_pin, )
             )
             res = cur.fetchone()
             cur.close()
-            con.close()
 
             if res:
                 logger.debug("PIN OK!")
@@ -299,13 +251,10 @@ class Saldo(QtGui.QWidget, saldo_ui.Ui_Form):
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
 
-        db = Database()
-        con = db.connect()
-        cur = con.cursor()
-        cur.execute("SELECT * FROM nasabah WHERE id = %s", (nasabah[0],))
+        cur = db.cursor()
+        cur.execute("SELECT * FROM nasabah WHERE id = ?", (nasabah[0],))
         self.nasabah = cur.fetchone()
         cur.close()
-        con.close()
 
         logger.info("Nasabah ID: " + str(self.nasabah[0]) + ", saldo: " + str(self.nasabah[2]))
         self.saldo.setText('{} LITER'.format(self.nasabah[2]))
@@ -325,13 +274,10 @@ class AmbilBeras(QtGui.QWidget, ambil_beras_ui.Ui_Form):
         super(self.__class__, self).__init__()
         self.setupUi(self)
 
-        db = Database()
-        db = db.connect()
         cur = db.cursor()
-        cur.execute("SELECT * FROM nasabah WHERE id = %s", (nasabah[0],))
+        cur.execute("SELECT * FROM nasabah WHERE id = ?", (nasabah[0],))
         self.nasabah = cur.fetchone()
         cur.close()
-        db.close()
 
         self.saldo = self.nasabah[2]
         self.info.setText('')
@@ -437,18 +383,17 @@ class UbahPin(QtGui.QWidget, ubah_pin_ui.Ui_Form):
 
             if len(self.confirm_pin) == 4:
                 if self.confirm_pin == self.entered_pin:
-                    db = Database()
-                    con = db.connect()
-                    cur = con.cursor()
-                    cur.execute("UPDATE nasabah SET pin = AES_ENCRYPT(%s, UNHEX(%s)) "
-                                "WHERE id = %s", (self.entered_pin, config["db"]["key"], self.nasabah[0]))
+                    cur = db.cursor()
                     cur.execute(
-                        "INSERT INTO transaksi (nasabah_id, jenis_transaksi, jumlah) VALUES (%s, 'ganti pin', 0)",
+                        "UPDATE nasabah SET pin = ? WHERE id = ?",
+                        (self.entered_pin, self.nasabah[0])
+                    )
+                    cur.execute(
+                        "INSERT INTO transaksi (nasabah_id, jenis_transaksi, jumlah) VALUES (?, 'ganti pin', 0)",
                         (self.nasabah[0],)
                     )
                     cur.close()
-                    con.commit()
-                    con.close()
+                    db.commit()
 
                     logger.info("Nasabah ID: " + str(self.nasabah[0]) + " Ganti PIN OK!")
                     self.info.setText("PIN ANDA BERHASIL DIUBAH")
@@ -515,16 +460,11 @@ class ScanThread(QtCore.QThread):
                 continue
 
             card_id = str(binascii.hexlify(uid))
-            db = Database()
-            con = db.connect()
-            cur = con.cursor()
-            cur.execute(
-                "SELECT * FROM nasabah WHERE card_id = AES_ENCRYPT(%s, UNHEX(%s))",
-                (card_id, config["db"]["key"])
-            )
+
+            cur = db.cursor()
+            cur.execute("SELECT * FROM nasabah WHERE card_id = ?", (card_id,))
             nasabah = cur.fetchone()
             cur.close()
-            con.close()
 
             if nasabah:
                 self.emit(QtCore.SIGNAL('cardDetected'), nasabah)
@@ -548,7 +488,6 @@ class ProsesThread(QtCore.QThread):
         logger.debug("Proses ambil beras nasabah ID: " + str(self.nasabah[0]))
         self.emit(QtCore.SIGNAL('infoProses'), "SEDANG MEMPROSES. SILAKAN TUNGGU...")
         play_audio("sedang_proses.ogg")
-        play_audio("backsound.ogg")
 
         # buka katup
         logger.debug("Buka katup")
@@ -556,13 +495,13 @@ class ProsesThread(QtCore.QThread):
         time.sleep(0.2)
         # hidupkan motor selama n detik
         GPIO.output(config["gpio_pin"]["motor_on"], 1)
-        time.sleep(config["timer_calibartion"]["open"])
+        time.sleep(config["timer_calibration"]["open"])
 
         # matikan motor
         logger.debug("Tunggu beras turun")
         GPIO.output(config["gpio_pin"]["motor_on"], 0)
         # tunggu sampai beras turun semua
-        time.sleep(config["timer_calibartion"]["wait"])
+        time.sleep(config["timer_calibration"]["wait"])
 
         # tutup katup
         logger.debug("Tutup katup")
@@ -570,24 +509,24 @@ class ProsesThread(QtCore.QThread):
         time.sleep(0.2)
         # hidupkan motor n detik
         GPIO.output(config["gpio_pin"]["motor_on"], 1)
-        time.sleep(config["timer_calibartion"]["close"])
+        time.sleep(config["timer_calibration"]["close"])
 
         # matikan motor
         GPIO.output(config["gpio_pin"]["motor_on"], 0)
         # untuk relay koplak only
         # GPIO.output(config["gpio_pin"]["motor_direction"], 1)
 
-        db = Database()
-        con = db.connect()
-        cur = con.cursor()
-        cur.execute("UPDATE nasabah SET saldo = %s WHERE id = %s", (self.saldo, self.nasabah[0]))
+        cur = db.cursor()
         cur.execute(
-            "INSERT INTO transaksi (nasabah_id, jenis_transaksi, jumlah) VALUES (%s, 'ambil', %s)",
+            "UPDATE nasabah SET saldo = ? WHERE id = ?",
+            (self.saldo, self.nasabah[0])
+        )
+        cur.execute(
+            "INSERT INTO transaksi (nasabah_id, jenis_transaksi, jumlah) VALUES (?, 'ambil', ?)",
             (self.nasabah[0], self.ambil)
         )
         cur.close()
-        con.commit()
-        con.close()
+        db.commit()
 
         try:
             data = {"id": config["id"], "saldo": config["scale"]}
@@ -646,31 +585,180 @@ class Console():
     def __init__(self):
         pass
 
-    def daftar(self):
-        nama = raw_input('Nama: ')
+    def scan_card(self):
+        while True:
+            uid = pn532.read_passive_target()
+            if uid is "no_card":
+                continue
+            return str(binascii.hexlify(uid))
 
-        if not nama:
-            continue
-
-        logger.info("Pendaftaran atas nama " + nama)
-        print "Tempelkan kartu ATMB..."
-        card_id = scan_card()
-
-        if card_is_registered(card_id):
-            logger.info("Pendaftaran gagal. Kartu telah terdaftar")
-            print "Pendaftaran gagal. Kartu telah terdaftar"
-            continue
-
+    def card_is_registered(self, card_id):
         cur = db.cursor()
-        cur.execute(
-            "INSERT INTO nasabah (nama, saldo, pin, card_id, alamat) VALUES (%s, 15, AES_ENCRYPT('1234', UNHEX(%s)), AES_ENCRYPT(%s, UNHEX(%s)), '-')",
-            (nama, config["db"]["key"], card_id, config["db"]["key"])
-        )
+        cur.execute("SELECT * FROM nasabah WHERE card_id = ?", (card_id,))
+        nasabah = cur.fetchone()
         cur.close()
-        db.commit()
+        return nasabah
 
-        logger.info("Pendaftaran atas nama " + nama + " Berhasil!")
-        print "Pendaftaran Berhasil"
+    def daftar(self):
+        try:
+            nama = raw_input('Nama: ')
+
+            if not nama:
+                return
+
+            logger.info("Pendaftaran atas nama " + nama)
+            print("Tempelkan kartu ATMB...")
+            card_id = self.scan_card()
+
+            if self.card_is_registered(card_id):
+                logger.info("Pendaftaran gagal. Kartu telah terdaftar")
+                print("Pendaftaran gagal. Kartu telah terdaftar")
+                continue
+
+            cur = db.cursor()
+            cur.execute(
+                "INSERT INTO nasabah (nama, saldo, pin, card_id, alamat) VALUES (?, 15, ?, ?, '-')",
+                (nama, card_id)
+            )
+            cur.close()
+            db.commit()
+
+            logger.info("Pendaftaran atas nama " + nama + " Berhasil!")
+            print("Pendaftaran Berhasil")
+
+        except KeyboardInterrupt:
+            return
+
+    def test_keypad(self):
+        try:
+            while True:
+                for j in range(len(config["gpio_pin"]["keypad_col"])):
+                    GPIO.output(config["gpio_pin"]["keypad_col"][j], 0)
+
+                    for i in range(len(config["gpio_pin"]["keypad_row"])):
+                        if GPIO.input(config["gpio_pin"]["keypad_row"][i]) == 0:
+                            key = keypad_matrix[i][j]
+                            print(key)
+                            time.sleep(0.27)
+
+                    GPIO.output(config["gpio_pin"]["keypad_col"][j], 1)
+                    time.sleep(0.03)
+
+        except KeyboardInterrupt:
+            return
+
+    def test_relay(self):
+        try:
+            print("1. Relay Motor ON/OF")
+            print("2. Relay Arah Motor maju/mundur")
+        except KeyboardInterrupt:
+            return
+
+    def test_motor(self):
+        pass
+
+    def test_nfc(self):
+        print("Tempelkan kartu...")
+        try:
+            card_id = self.scan_card()
+            nasabah = self.card_is_registered()
+
+            if nasabah is None:
+                print("Kartu belum terdaftar")
+            else:
+                print("Kartu terdaftar atas nama", nasabah[1])
+
+        except KeyboardInterrupt:
+            return
+
+    def test_audio(self):
+        try:
+            audios = os.listdir(os.path.join(os.path.dirname(__file__), "audio"))
+            data = [["INDEX", "NAMA FILE"]]
+
+            for i, f in enumerate(audios):
+                data.append([str(i), f])
+
+            table = AsciiTable(data)
+            print(table.table)
+
+            audio = raw_input("Masukkan index file audio yang akan anda mainkan : ")
+
+            play_audio(int(audio))
+
+        except Exception as e:
+            mixer.music.stop()
+            print(str(e))
+            return
+
+    def sync_data(self):
+        pass
+
+    def drain(self):
+        try:
+            confirm = raw_input("Anda yakin? (y/n) : ")
+
+            if confirm != "y":
+                return
+
+
+
+        except Exception as e:
+            return
+
+    def simulasi(self):
+        try:
+            confirm = raw_input('Anda yakin? (y/n) :')
+            if confirm != "y":
+                return
+
+            # buka katup
+            print("Membuka katup...")
+            GPIO.output(config["gpio_pin"]["motor_direction"], 1)
+            time.sleep(0.2)
+            # hidupkan motor selama n detik
+            GPIO.output(config["gpio_pin"]["motor_on"], 1)
+            time.sleep(config["timer_calibration"]["open"])
+
+            # matikan motor
+            print("Tunggu beras turun")
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
+            # tunggu sampai beras turun semua
+            time.sleep(config["timer_calibration"]["wait"])
+
+            # tutup katup
+            print("Tutup katup")
+            GPIO.output(config["gpio_pin"]["motor_direction"], 0)
+            time.sleep(0.2)
+            # hidupkan motor n detik
+            GPIO.output(config["gpio_pin"]["motor_on"], 1)
+            time.sleep(config["timer_calibration"]["close"])
+
+            # matikan motor
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
+            # untuk relay koplak only
+            # GPIO.output(config["gpio_pin"]["motor_direction"], 1)
+
+        except KeyboardInterrupt:
+            return
+
+    def help(self):
+        data = [
+            ['PERINTAH', 'KETERANGAN'],
+            ['?', 'Menampilkan pesan ini'],
+            ['daftar', 'Mendaftarkan kartu baru'],
+            ['simulasi', 'Simulasi pengambilan beras untuk test mekanikal'],
+            ['test relay', 'Untuk test relay'],
+            ['test motor', 'Untuk test motor'],
+            ['test keypad', 'Untuk test matix keypad'],
+            ['test nfc', 'Untuk test nfc'],
+            ['sync data', 'Sinkronisasi data ke server'],
+            ['drain', 'Mengosongkan isi beras'],
+            ['quit', 'Keluar dari progam CLI']
+        ]
+
+        table = AsciiTable(data)
+        print(table.table)
 
     def run(self):
         try:
@@ -680,26 +768,40 @@ class Console():
                 if cmd == "daftar":
                     self.daftar()
 
+                elif cmd == "test relay":
+                    self.test_relay()
+
+                elif cmd == "test keypad":
+                    self.test_keypad()
+
+                elif cmd == "test nfc":
+                    self.test_nfc()
+
+                elif cmd == "test audio":
+                    self.test_audio()
+
+                elif cmd == "help" or cmd == "?":
+                    self.help()
+
                 elif cmd == "quit":
-                    print "Bye"
+                    print("Bye")
                     break
 
+                elif cmd.strip():
+                    print("Perintah tidak dikenal. Ketik '?' untuk bantuan.")
+
+                else:
+                    pass
+
         except KeyboardInterrupt:
-            print "Bye"
-
-
-def scan_card():
-    while True:
-        uid = pn532.read_passive_target()
-
-        if uid is "no_card":
-            continue
-
-        return str(binascii.hexlify(uid))
+            print("Bye")
+            exit()
 
 
 def play_audio(audio_file, loops=0):
-    audio = os.path.join(os.path.dirname(__file__), audio_file)
+    audio = os.path.join(os.path.dirname(__file__), "audio/" + audio_file)
+    mixer.music.stop()
+
     if os.path.isfile(audio):
         try:
             mixer.music.load(audio)
@@ -709,49 +811,19 @@ def play_audio(audio_file, loops=0):
         mixer.music.play(loops)
 
 
-def card_is_registered(card_id):
-    db = Database()
-    con = db.connect()
-    cur = con.cursor()
-    cur.execute(
-        "SELECT * FROM nasabah WHERE card_id = AES_ENCRYPT(%s, UNHEX(%s))",
-        (card_id, config["db"]["key"])
-    )
-    nasabah = cur.fetchone()
-    cur.close()
-    con.close()
-
-    return nasabah
-
-
-def init_gpio():
-    GPIO.setmode(GPIO.BOARD)
-    GPIO.setwarnings(False)
-
-    for i in range(len(config["gpio_pin"]["keypad_row"])):
-        GPIO.setup(config["gpio_pin"]["keypad_row"][i], GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-    for i in range(len(config["gpio_pin"]["keypad_col"])):
-        GPIO.setup(config["gpio_pin"]["keypad_col"][i], GPIO.OUT)
-        GPIO.output(config["gpio_pin"]["keypad_col"][i], 1)
-
-    GPIO.setup(config["gpio_pin"]["motor_direction"], GPIO.OUT)
-    GPIO.setup(config["gpio_pin"]["motor_on"], GPIO.OUT)
-
-    # untuk relay koplak
-    # GPIO.output(config["gpio_pin"]["motor_direction"], 1)
-
-
 if __name__ == "__main__":
     config_file_path = os.path.join(os.path.dirname(__file__), 'config.json')
-    log_file_path = os.path.join(os.path.dirname(__file__), 'atmb.log')
 
     try:
         with open(config_file_path) as config_file:
             config = json.load(config_file)
     except Exception as e:
-        print "Gagal membuka file konfigurasi (config.json)" + str(e)
+        print("Gagal membuka file konfigurasi (config.json)" + str(e))
         exit()
+
+    message = "Initializing logger..."
+    logger.debug(message)
+    print(message)
 
     log_level = {
         "NOTSET": 0,
@@ -762,6 +834,7 @@ if __name__ == "__main__":
         "CRITICAL": 50
     }
 
+    log_file_path = os.path.join(os.path.dirname(__file__), 'atmb.log')
     logger = logging.getLogger(__name__)
     logger.setLevel(log_level[config["log_level"]])
     handler = logging.handlers.RotatingFileHandler(log_file_path, maxBytes=1024000, backupCount=100)
@@ -770,39 +843,44 @@ if __name__ == "__main__":
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
+    message = "Initializing database..."
+    logger.debug(message)
+    print(message)
+
     if config["db"]["driver"] == "sqlite":
-        logger.debug("Connecting to database...")
-        db = sqlite3.connect(os.path.join(os.path.dirname(__file__), config["db"]["name"]), check_same_thread=False)
         logger.debug("Creating database schema...")
+        db = sqlite3.connect(os.path.join(os.path.dirname(__file__), config["db"]["name"]), check_same_thread=False)
 
         db.execute("CREATE TABLE IF NOT EXISTS `penerima` ( \
             `id` INTEGER PRIMARY KEY AUTOINCREMENT, \
             `uuid` varchar(50) NULL, \
             `nama` varchar(30) NOT NULL, \
             `card_id` varchar(20) NULL, \
-            `template` text NULL, \
-            `template1` text NULL, \
-            `active` boolean default 1, \
-            `allow` boolean default 1, \
-            `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, \
-            `last_access` timestamp NULL, \
             `waktu_daftar` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP)");
 
-        db.execute("CREATE TABLE IF NOT EXISTS `log` ( \
+        db.execute("CREATE TABLE IF NOT EXISTS `log_transaksi` ( \
             `id` INTEGER PRIMARY KEY AUTOINCREMENT, \
-            `karyawan_id` int(11) NULL, \
+            `nasabah_id` int(11) NULL, \
+            `jenis_transaksi` VARCHAR(30) NOT NULL, \
+            `jumlah` int(11) NULL, \
             `waktu` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP)")
+
+        db.execute("CREATE TABLE IF NOT EXISTS `status` ( \
+            `saldo` int(11) NOT NULL DEFAULT 0, \
+            `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP)")
     else:
         message = "Hanya bisa memakai sqlite"
         print(message)
         logger.error(message)
         exit()
 
-    # initiate nfc
     logger.debug("Waiting NFC ready...")
     time.sleep(3)
+    message = "Initializing NFC Reader..."
+    logger.debug(message)
+    print(message)
+
     try:
-        logger.debug("Initializing NFC Reader...")
         pn532 = PN532.PN532(config["device"]["nfc"], 115200)
         pn532.begin()
         pn532.SAM_configuration()
@@ -820,16 +898,41 @@ if __name__ == "__main__":
         ['*', 0, '#']
     ]
 
-    logger.debug("Initializing GPIO...")
-    init_gpio()
-    logger.debug("GPIO Initialized...")
+    message = "Initializing GPIO..."
+    logger.debug(message)
+    print(message)
+
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setwarnings(False)
+
+    for i in range(len(config["gpio_pin"]["keypad_row"])):
+        GPIO.setup(config["gpio_pin"]["keypad_row"][i], GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    for i in range(len(config["gpio_pin"]["keypad_col"])):
+        GPIO.setup(config["gpio_pin"]["keypad_col"][i], GPIO.OUT)
+        GPIO.output(config["gpio_pin"]["keypad_col"][i], 1)
+
+    GPIO.setup(config["gpio_pin"]["motor_direction"], GPIO.OUT)
+    GPIO.setup(config["gpio_pin"]["motor_on"], GPIO.OUT)
+
+    # untuk relay koplak
+    # GPIO.output(config["gpio_pin"]["motor_direction"], 1)
+
+    mixer.init()
 
     if len(sys.argv) > 1 and sys.argv[1] == "run":
-        logger.debug("Starting GUI Application...")
-        mixer.init()
+        message = "Starting GUI Application..."
+        logger.debug(message)
+        print(message)
+
         app = QtGui.QApplication(sys.argv)
         ui = Main()
         sys.exit(app.exec_())
 
     else:
-        console()
+        message = "Starting console application..."
+        logger.debug(message)
+        print(message)
+
+        console = Console()
+        console.run()
