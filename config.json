@@ -4,6 +4,7 @@
     "kode_kelurahan": "001",
     "kode_atm": "001",
     "selection": [3],
+    "scale": 3,
     "log_level": "DEBUG",
     "api_url": "http://http://114.6.180.154/atmb/api/",
     "device": {

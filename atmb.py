@@ -76,8 +76,17 @@ class Main(QtGui.QWidget, main_ui.Ui_main):
     def card_detected(self, nasabah):
         logger.info("NFC Card detected! Nasabah ID: " + str(nasabah[0]))
         self.timer.stop()
-        self.keypad_thread.terminate()
-        self.scan_thread.terminate()
+
+        try:
+            self.keypad_thread.terminate()
+        except Exception as e:
+            logger.error("Failed to terminate keypad thread." + str(e))
+
+        try:
+            self.scan_thread.terminate()
+        except Exception as e:
+            logger.error("Failed to terminate scan thread." + str(e))
+
         self.window = InputPin(nasabah)
         self.close()
 
@@ -191,7 +200,11 @@ class MainMenu(QtGui.QWidget, menu_ui.Ui_Form):
         self.timer.start(20000)
 
     def time_out(self):
-        self.keypad_thread.terminate()
+        try:
+            self.keypad_thread.terminate()
+        except Exception as e:
+            logger.error("Failed to terminate keypad thread. " + str(e))
+
         self.window = Main()
         self.close()
 
@@ -220,7 +233,7 @@ class MainMenu(QtGui.QWidget, menu_ui.Ui_Form):
         self.keypad_thread.terminate()
 
         if len(config["selection"]) == 1:
-            self.window = Proses(self.nasabah, config["selection"])
+            self.window = Proses(self.nasabah, config["selection"][0])
         else:
             self.window = AmbilBeras(self.nasabah)
 
@@ -483,38 +496,42 @@ class ProsesThread(QtCore.QThread):
         self.nasabah = nasabah
         self.ambil = ambil
         self.saldo = self.nasabah[2] - self.ambil
+        self.jumlah_proses = self.ambil / config["scale"]
 
     def run(self):
         logger.debug("Proses ambil beras nasabah ID: " + str(self.nasabah[0]))
         self.emit(QtCore.SIGNAL('infoProses'), "SEDANG MEMPROSES. SILAKAN TUNGGU...")
         play_audio("sedang_proses.ogg")
 
-        # buka katup
-        logger.debug("Buka katup")
-        GPIO.output(config["gpio_pin"]["motor_direction"], 1)
-        time.sleep(0.2)
-        # hidupkan motor selama n detik
-        GPIO.output(config["gpio_pin"]["motor_on"], 1)
-        time.sleep(config["timer_calibration"]["open"])
+        # asumsi jumlah ambil habis dibagi scale
+        # asumsi: scale 1, pilihan ambil 1,2,3. scale 3, ga ada pilihan ambil
+        for i in range(self.ambil / config["scale"]):
+            # buka katup
+            logger.debug("Buka katup")
+            GPIO.output(config["gpio_pin"]["motor_direction"], 1)
+            time.sleep(0.2)
+            # hidupkan motor selama n detik
+            GPIO.output(config["gpio_pin"]["motor_on"], 1)
+            time.sleep(config["timer_calibration"]["open"])
 
-        # matikan motor
-        logger.debug("Tunggu beras turun")
-        GPIO.output(config["gpio_pin"]["motor_on"], 0)
-        # tunggu sampai beras turun semua
-        time.sleep(config["timer_calibration"]["wait"])
+            # matikan motor
+            logger.debug("Tunggu beras turun")
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
+            # tunggu sampai beras turun semua
+            time.sleep(config["timer_calibration"]["wait"])
 
-        # tutup katup
-        logger.debug("Tutup katup")
-        GPIO.output(config["gpio_pin"]["motor_direction"], 0)
-        time.sleep(0.2)
-        # hidupkan motor n detik
-        GPIO.output(config["gpio_pin"]["motor_on"], 1)
-        time.sleep(config["timer_calibration"]["close"])
+            # tutup katup
+            logger.debug("Tutup katup")
+            GPIO.output(config["gpio_pin"]["motor_direction"], 0)
+            time.sleep(0.2)
+            # hidupkan motor n detik
+            GPIO.output(config["gpio_pin"]["motor_on"], 1)
+            time.sleep(config["timer_calibration"]["close"])
 
-        # matikan motor
-        GPIO.output(config["gpio_pin"]["motor_on"], 0)
-        # untuk relay koplak only
-        # GPIO.output(config["gpio_pin"]["motor_direction"], 1)
+            # matikan motor
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
+            # untuk relay koplak only
+            # GPIO.output(config["gpio_pin"]["motor_direction"], 1)
 
         cur = db.cursor()
         cur.execute(
@@ -529,10 +546,10 @@ class ProsesThread(QtCore.QThread):
         db.commit()
 
         try:
-            data = {"id": config["id"], "saldo": config["scale"]}
-            r = requests.post(config["api_url"] + '/atm/update')
+            data = {"id": config["id"], "saldo": config["selection"]}
+            r = requests.post(config["api_url"] + '/atm/update', data=data, timeout=3)
         except Exception as e:
-            pass
+            logger.debug("Failed to sync to server. " + str(e))
 
 
 class Proses(QtGui.QWidget, proses_ui.Ui_Form):
