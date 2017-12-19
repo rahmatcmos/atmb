@@ -4,25 +4,27 @@
     "kode_kelurahan": "001",
     "kode_atm": "001",
     "selection": [3],
+    "logo": "img/logo.png",
     "scale": 3,
     "log_level": "DEBUG",
-    "api_url": "http://http://114.6.180.154/atmb/api/",
+    "api_url": "http://114.6.180.154/atmb/api/",
     "device": {
         "nfc": "/dev/serial5"
     },
     "db": {
         "driver": "sqlite",
-        "name": "atmb.db",
+        "name": "atmb.db"
     },
     "gpio_pin": {
         "motor_direction": 16,
         "motor_on": 18,
+        "sensor_pintu": 22,
         "keypad_row": [31, 33, 35, 37],
         "keypad_col": [36, 38, 40]
     },
     "timer_calibration": {
-        "open": 20,
-        "close": 21,
+        "open": 10,
+        "close": 10,
         "wait": 3
     }
 }

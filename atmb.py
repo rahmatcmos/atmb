@@ -22,6 +22,8 @@ import os
 import logging
 import logging.handlers
 from pygame import mixer
+from terminaltables import AsciiTable
+import uuid
 
 
 class Main(QtGui.QWidget, main_ui.Ui_main):
@@ -30,7 +32,8 @@ class Main(QtGui.QWidget, main_ui.Ui_main):
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
         self.update_clock()
-        self.info.setText("TEMPELKAN KARTU ATMB ANDA...")
+        self.info.setText("")
+        self.logo.setPixmap(QtGui.QPixmap(os.path.join(os.path.dirname(__file__), config["logo"])))
         self.password = ''
         self.beras_habis = False
 
@@ -49,7 +52,7 @@ class Main(QtGui.QWidget, main_ui.Ui_main):
         logger.debug("Starting scanning NFC card...")
         self.scan_thread.start()
 
-        play_audio("backsound.ogg")
+        play_audio("backsound.ogg", -1)
 
     def keypad_pressed_event(self, key):
         self.password += str(key)
@@ -73,8 +76,8 @@ class Main(QtGui.QWidget, main_ui.Ui_main):
             logger.info("Shutting down machine...")
             subprocess.call(['sudo', 'shutdown', '-h', 'now'])
 
-    def card_detected(self, nasabah):
-        logger.info("NFC Card detected! Nasabah ID: " + str(nasabah[0]))
+    def card_detected(self, penerima):
+        logger.info("NFC Card detected! penerima ID: " + str(penerima[0]))
         self.timer.stop()
 
         try:
@@ -87,7 +90,7 @@ class Main(QtGui.QWidget, main_ui.Ui_main):
         except Exception as e:
             logger.error("Failed to terminate scan thread." + str(e))
 
-        self.window = InputPin(nasabah)
+        self.window = InputPin(penerima)
         self.close()
 
     def update_info(self, info):
@@ -97,15 +100,14 @@ class Main(QtGui.QWidget, main_ui.Ui_main):
         self.tanggal.setText(time.strftime("%d %b %Y"))
         self.jam.setText(time.strftime("%H:%M:%S"))
 
-
 class InputPin(QtGui.QWidget, input_pin_ui.Ui_Form):
-    def __init__(self, nasabah):
+    def __init__(self, penerima):
         super(self.__class__, self).__init__()
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
         self.entered_pin = ''
         self.masked_pin = ''
-        self.nasabah = nasabah
+        self.penerima = penerima
 
         self.info.setText("SELAMAT DATANG. MASUKKAN PIN ANDA")
         self.showFullScreen()
@@ -145,12 +147,12 @@ class InputPin(QtGui.QWidget, input_pin_ui.Ui_Form):
         self.pin.setText(self.masked_pin)
 
         if len(self.entered_pin) == 4:
-            logger.debug("Nasabah ID: " + str(self.nasabah[0]) + ", PIN: " + self.entered_pin)
+            logger.debug("penerima ID: " + str(self.penerima[0]) + ", PIN: " + self.entered_pin)
 
             cur = db.cursor()
             cur.execute(
-                "SELECT * FROM nasabah where id = ? AND pin = ?",
-                (self.nasabah[0], self.entered_pin, )
+                "SELECT * FROM penerima where id = ? AND pin = ?",
+                (self.penerima[0], self.entered_pin, )
             )
             res = cur.fetchone()
             cur.close()
@@ -159,7 +161,7 @@ class InputPin(QtGui.QWidget, input_pin_ui.Ui_Form):
                 logger.debug("PIN OK!")
                 self.timer.stop()
                 self.keypad_thread.terminate()
-                self.menu = MainMenu(self.nasabah)
+                self.menu = MainMenu(self.penerima)
                 self.close()
 
             else:
@@ -182,11 +184,11 @@ class InputPin(QtGui.QWidget, input_pin_ui.Ui_Form):
 
 
 class MainMenu(QtGui.QWidget, menu_ui.Ui_Form):
-    def __init__(self, nasabah):
+    def __init__(self, penerima):
         super(self.__class__, self).__init__()
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
-        self.nasabah = nasabah
+        self.penerima = penerima
         self.info.setText("")
         self.showFullScreen()
 
@@ -222,9 +224,9 @@ class MainMenu(QtGui.QWidget, menu_ui.Ui_Form):
             self.selesai()
 
     def ambil_beras(self):
-        logger.debug("Nasabah ID: " + str(self.nasabah[0]) + " ambil beras")
-        if self.nasabah[2] == 0:
-            logger.debug("Nasabah ID: " + str(self.nasabah[0]) + " transaksi di tolak. Saldo 0")
+        logger.debug("penerima ID: " + str(self.penerima[0]) + " ambil beras")
+        if self.penerima[5] == 0:
+            logger.debug("penerima ID: " + str(self.penerima[0]) + " transaksi di tolak. Saldo 0")
             self.info.setText("MAAF, TRANSAKSI DITOLAK. SALDO ANDA 0.")
             play_audio("saldo_habis.ogg")
             return
@@ -233,22 +235,22 @@ class MainMenu(QtGui.QWidget, menu_ui.Ui_Form):
         self.keypad_thread.terminate()
 
         if len(config["selection"]) == 1:
-            self.window = Proses(self.nasabah, config["selection"][0])
+            self.window = Proses(self.penerima, config["selection"][0])
         else:
-            self.window = AmbilBeras(self.nasabah)
+            self.window = AmbilBeras(self.penerima)
 
         self.close()
 
     def cek_saldo(self):
         self.timer.stop()
         self.keypad_thread.terminate()
-        self.window = Saldo(self.nasabah)
+        self.window = Saldo(self.penerima)
         self.close()
 
     def ubah_pin(self):
         self.timer.stop()
         self.keypad_thread.terminate()
-        self.window = UbahPin(self.nasabah)
+        self.window = UbahPin(self.penerima)
         self.close()
 
     def selesai(self):
@@ -259,18 +261,17 @@ class MainMenu(QtGui.QWidget, menu_ui.Ui_Form):
 
 
 class Saldo(QtGui.QWidget, saldo_ui.Ui_Form):
-    def __init__(self, nasabah):
+    def __init__(self, penerima):
         super(self.__class__, self).__init__()
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
 
         cur = db.cursor()
-        cur.execute("SELECT * FROM nasabah WHERE id = ?", (nasabah[0],))
-        self.nasabah = cur.fetchone()
+        cur.execute("SELECT `saldo` FROM penerima WHERE id = ?", (penerima[0],))
+        self.penerima = cur.fetchone()
         cur.close()
 
-        logger.info("Nasabah ID: " + str(self.nasabah[0]) + ", saldo: " + str(self.nasabah[2]))
-        self.saldo.setText('{} LITER'.format(self.nasabah[2]))
+        self.saldo.setText('{} LITER'.format(self.penerima[0]))
         self.showFullScreen()
 
         self.timer = QtCore.QTimer()
@@ -283,16 +284,16 @@ class Saldo(QtGui.QWidget, saldo_ui.Ui_Form):
         self.close()
 
 class AmbilBeras(QtGui.QWidget, ambil_beras_ui.Ui_Form):
-    def __init__(self, nasabah):
+    def __init__(self, penerima):
         super(self.__class__, self).__init__()
         self.setupUi(self)
 
         cur = db.cursor()
-        cur.execute("SELECT * FROM nasabah WHERE id = ?", (nasabah[0],))
-        self.nasabah = cur.fetchone()
+        cur.execute("SELECT * FROM penerima WHERE id = ?", (penerima[0],))
+        self.penerima = cur.fetchone()
         cur.close()
 
-        self.saldo = self.nasabah[2]
+        self.saldo = self.penerima[5]
         self.info.setText('')
 
         if self.saldo == 0:
@@ -335,7 +336,7 @@ class AmbilBeras(QtGui.QWidget, ambil_beras_ui.Ui_Form):
     def kembali(self):
         self.timer.stop()
         self.keypad_thread.terminate()
-        self.window = MainMenu(self.nasabah)
+        self.window = MainMenu(self.penerima)
         self.close()
 
     def proses(self):
@@ -347,16 +348,16 @@ class AmbilBeras(QtGui.QWidget, ambil_beras_ui.Ui_Form):
         else:
             self.timer.stop()
             self.keypad_thread.terminate()
-            self.window = Proses(self.nasabah, self.ambil)
+            self.window = Proses(self.penerima, self.ambil)
             self.close()
 
 
 class UbahPin(QtGui.QWidget, ubah_pin_ui.Ui_Form):
-    def __init__(self, nasabah):
+    def __init__(self, penerima):
         super(self.__class__, self).__init__()
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
-        self.nasabah = nasabah
+        self.penerima = penerima
         self.entered_pin = ''
         self.confirm_pin = ''
         self.masked_pin = ''
@@ -398,23 +399,23 @@ class UbahPin(QtGui.QWidget, ubah_pin_ui.Ui_Form):
                 if self.confirm_pin == self.entered_pin:
                     cur = db.cursor()
                     cur.execute(
-                        "UPDATE nasabah SET pin = ? WHERE id = ?",
-                        (self.entered_pin, self.nasabah[0])
+                        "UPDATE penerima SET pin = ? WHERE id = ?",
+                        (self.entered_pin, self.penerima[0])
                     )
                     cur.execute(
-                        "INSERT INTO transaksi (nasabah_id, jenis_transaksi, jumlah) VALUES (?, 'ganti pin', 0)",
-                        (self.nasabah[0],)
+                        "INSERT INTO log_transaksi (penerima_id, jenis_transaksi, jumlah) VALUES (?, 'ganti pin', 0)",
+                        (self.penerima[0],)
                     )
                     cur.close()
                     db.commit()
 
-                    logger.info("Nasabah ID: " + str(self.nasabah[0]) + " Ganti PIN OK!")
+                    logger.info("penerima ID: " + str(self.penerima[0]) + " Ganti PIN OK!")
                     self.info.setText("PIN ANDA BERHASIL DIUBAH")
                     play_audio("pin_berhasil_diubah.ogg")
                     self.pin.setText('')
 
                 else:
-                    logger.info("Nasabah ID: " + str(self.nasabah[0]) + " Ganti PIN GAGAL! PIN tidak sama.")
+                    logger.info("penerima ID: " + str(self.penerima[0]) + " Ganti PIN GAGAL! PIN tidak sama.")
                     self.info.setText("PIN TIDAK SAMA. SILAKAN ULANGI KEMBALI")
                     play_audio("pin_tidak_sama.ogg")
                     self.pin.setText("----")
@@ -445,7 +446,7 @@ class UbahPin(QtGui.QWidget, ubah_pin_ui.Ui_Form):
     def kembali(self):
         self.timer.stop()
         self.keypad_thread.terminate()
-        self.window = MainMenu(self.nasabah)
+        self.window = MainMenu(self.penerima)
         self.close()
 
 
@@ -460,6 +461,28 @@ class ScanThread(QtCore.QThread):
 
     def run(self):
         while not self.exiting:
+            if not GPIO.input(config["gpio_pin"]["sensor_pintu"]):
+                self.emit(QtCore.SIGNAL('updateInfo'), "MOHON TUTUP PINTU PENGISIAN BERAS")
+                time.sleep(5)
+                data = {"id": config["id"], "status_pintu": 0, "saldo": 0}
+
+                try:
+                    r = requests.post(config["api_url"] + "atm/update", data=data, timeout=5)
+                except Exception as e:
+                    logger.debug("Failed to sync to server " + str(e))
+
+                continue
+
+            else:
+                data = {"id": config["id"], "status_pintu": 1, "saldo": 0}
+
+                try:
+                    r = requests.post(config["api_url"] + "atm/update", data=data, timeout=5)
+                except Exception as e:
+                    logger.debug("Failed to sync to server " + str(e))
+
+                self.emit(QtCore.SIGNAL('updateInfo'), "TEMPELKAN KARTU ATMB ANDA...")
+
             try:
                 uid = pn532.read_passive_target()
             except Exception as e:
@@ -475,31 +498,30 @@ class ScanThread(QtCore.QThread):
             card_id = str(binascii.hexlify(uid))
 
             cur = db.cursor()
-            cur.execute("SELECT * FROM nasabah WHERE card_id = ?", (card_id,))
-            nasabah = cur.fetchone()
+            cur.execute("SELECT * FROM penerima WHERE card_id = ?", (card_id,))
+            penerima = cur.fetchone()
             cur.close()
 
-            if nasabah:
-                self.emit(QtCore.SIGNAL('cardDetected'), nasabah)
+            if penerima:
+                self.emit(QtCore.SIGNAL('cardDetected'), penerima)
                 break
 
             else:
                 logger.info("Kartu tidak terdaftar")
                 self.emit(QtCore.SIGNAL('updateInfo'), "KARTU TIDAK TERDAFTAR")
                 time.sleep(3)
-                self.emit(QtCore.SIGNAL('updateInfo'), "TEMPELKAN KARTU ATMB ANDA...")
 
 
 class ProsesThread(QtCore.QThread):
-    def __init__(self, nasabah, ambil):
+    def __init__(self, penerima, ambil):
         super(self.__class__, self).__init__()
-        self.nasabah = nasabah
+        self.penerima = penerima
         self.ambil = ambil
-        self.saldo = self.nasabah[2] - self.ambil
+        self.saldo = self.penerima[5] - self.ambil
         self.jumlah_proses = self.ambil / config["scale"]
 
     def run(self):
-        logger.debug("Proses ambil beras nasabah ID: " + str(self.nasabah[0]))
+        logger.debug("Proses ambil beras penerima ID: " + str(self.penerima[0]))
         self.emit(QtCore.SIGNAL('infoProses'), "SEDANG MEMPROSES. SILAKAN TUNGGU...")
         play_audio("sedang_proses.ogg")
 
@@ -535,32 +557,33 @@ class ProsesThread(QtCore.QThread):
 
         cur = db.cursor()
         cur.execute(
-            "UPDATE nasabah SET saldo = ? WHERE id = ?",
-            (self.saldo, self.nasabah[0])
+            "UPDATE penerima SET saldo = ? WHERE id = ?",
+            (self.saldo, self.penerima[0])
         )
         cur.execute(
-            "INSERT INTO transaksi (nasabah_id, jenis_transaksi, jumlah) VALUES (?, 'ambil', ?)",
-            (self.nasabah[0], self.ambil)
+            "INSERT INTO log_transaksi (penerima_id, jenis_transaksi, jumlah) VALUES (?, 'ambil', ?)",
+            (self.penerima[0], self.ambil)
         )
         cur.close()
         db.commit()
 
+        data = {"id": config["id"], "saldo": self.ambil}
+
         try:
-            data = {"id": config["id"], "saldo": config["selection"]}
-            r = requests.post(config["api_url"] + '/atm/update', data=data, timeout=3)
+            r = requests.post(config["api_url"] + 'atm/update', data=data, timeout=5)
         except Exception as e:
             logger.debug("Failed to sync to server. " + str(e))
 
 
 class Proses(QtGui.QWidget, proses_ui.Ui_Form):
-    def __init__(self, nasabah, ambil):
+    def __init__(self, penerima, ambil):
         super(self.__class__, self).__init__()
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setupUi(self)
-        self.nasabah = nasabah
+        self.penerima = penerima
         self.showFullScreen()
 
-        self.proses_thread = ProsesThread(nasabah, ambil)
+        self.proses_thread = ProsesThread(penerima, ambil)
         self.connect(self.proses_thread, QtCore.SIGNAL('infoProses'), self.update_info)
         self.connect(self.proses_thread, QtCore.SIGNAL('finished()'), self.selesai)
         self.proses_thread.start()
@@ -569,7 +592,7 @@ class Proses(QtGui.QWidget, proses_ui.Ui_Form):
         self.info.setText(info)
 
     def selesai(self):
-        self.window = Saldo(self.nasabah)
+        self.window = Saldo(self.penerima)
         self.close()
 
 
@@ -611,10 +634,10 @@ class Console():
 
     def card_is_registered(self, card_id):
         cur = db.cursor()
-        cur.execute("SELECT * FROM nasabah WHERE card_id = ?", (card_id,))
-        nasabah = cur.fetchone()
+        cur.execute("SELECT * FROM penerima WHERE card_id = ?", (card_id,))
+        penerima = cur.fetchone()
         cur.close()
-        return nasabah
+        return penerima
 
     def daftar(self):
         try:
@@ -630,12 +653,12 @@ class Console():
             if self.card_is_registered(card_id):
                 logger.info("Pendaftaran gagal. Kartu telah terdaftar")
                 print("Pendaftaran gagal. Kartu telah terdaftar")
-                continue
+                return
 
             cur = db.cursor()
             cur.execute(
-                "INSERT INTO nasabah (nama, saldo, pin, card_id, alamat) VALUES (?, 15, ?, ?, '-')",
-                (nama, card_id)
+                "INSERT INTO penerima (uuid, nama, saldo, pin, card_id) VALUES (?, ?, ?, ?, ?)",
+                (str(uuid.uuid4()), nama, 1000, '1234', card_id)
             )
             cur.close()
             db.commit()
@@ -645,6 +668,38 @@ class Console():
 
         except KeyboardInterrupt:
             return
+
+    def list(self):
+        cur = db.cursor()
+        cur.execute(
+            "SELECT `nama`, `pin`, `card_id`, `saldo`, datetime(`waktu_daftar`, 'localtime') FROM `penerima` ORDER BY `nama` ASC"
+        )
+        result = cur.fetchall()
+        cur.close()
+
+        data = [["NAMA", "PIN", "CARD ID", "SALDO", "WAKTU DAFTAR"]]
+
+        for row, item in enumerate(result):
+            data.append([str(item[0]), item[1], item[2], item[3], item[4]])
+
+        table = AsciiTable(data)
+        print(table.table)
+
+    def log(self):
+        cur = db.cursor()
+        cur.execute(
+            "SELECT `penerima`.`nama`, `jenis_transaksi`, `jumlah`, datetime(`waktu`, 'localtime') FROM `log_transaksi` JOIN `penerima` ON `penerima`.`id` = `log_transaksi`.`penerima_id` ORDER BY `waktu` DESC"
+        )
+        result = cur.fetchall()
+        cur.close()
+
+        data = [["NAMA", "JENIS TRANSAKSI", "JUMLAH", "WAKTU"]]
+
+        for row, item in enumerate(result):
+            data.append([str(item[0]), item[1], item[2], item[3]])
+
+        table = AsciiTable(data)
+        print(table.table)
 
     def test_keypad(self):
         try:
@@ -678,12 +733,12 @@ class Console():
         print("Tempelkan kartu...")
         try:
             card_id = self.scan_card()
-            nasabah = self.card_is_registered()
+            penerima = self.card_is_registered()
 
-            if nasabah is None:
+            if penerima is None:
                 print("Kartu belum terdaftar")
             else:
-                print("Kartu terdaftar atas nama", nasabah[1])
+                print("Kartu terdaftar atas nama", penerima[1])
 
         except KeyboardInterrupt:
             return
@@ -700,8 +755,8 @@ class Console():
             print(table.table)
 
             audio = raw_input("Masukkan index file audio yang akan anda mainkan : ")
-
-            play_audio(int(audio))
+            print("Playing" + audios[int(audio)])
+            play_audio(audios[int(audio)])
 
         except Exception as e:
             mixer.music.stop()
@@ -709,7 +764,12 @@ class Console():
             return
 
     def sync_data(self):
-        pass
+        r = requests.get(config["api_url"] + "penerima?kode_kelurahan=" + config["kode_kelurahan"] + "&kode_kecamatan=" + config["kode_kecamatan"])
+
+        penerima = r.json()
+
+        for p in penerima:
+            cur.execute("INSERT INTO `penerima`")
 
     def drain(self):
         try:
@@ -721,6 +781,28 @@ class Console():
 
 
         except Exception as e:
+            return
+
+    def motor_push(self):
+        try:
+            GPIO.output(config["gpio_pin"]["motor_direction"], 1)
+            time.sleep(0.2)
+            GPIO.output(config["gpio_pin"]["motor_on"], 1)
+            time.sleep(config["timer_calibration"]["open"])
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
+        except KeyboardInterrupt:
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
+            return
+
+    def motor_pull(self):
+        try:
+            GPIO.output(config["gpio_pin"]["motor_direction"], 0)
+            time.sleep(0.2)
+            GPIO.output(config["gpio_pin"]["motor_on"], 1)
+            time.sleep(config["timer_calibration"]["open"])
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
+        except KeyboardInterrupt:
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
             return
 
     def simulasi(self):
@@ -764,10 +846,13 @@ class Console():
             ['PERINTAH', 'KETERANGAN'],
             ['?', 'Menampilkan pesan ini'],
             ['daftar', 'Mendaftarkan kartu baru'],
+            ['list', 'List Penerima'],
             ['simulasi', 'Simulasi pengambilan beras untuk test mekanikal'],
             ['test relay', 'Untuk test relay'],
-            ['test motor', 'Untuk test motor'],
+            ['motor pull', 'Untuk motor pull'],
+            ['motor push', 'Untuk motor push'],
             ['test keypad', 'Untuk test matix keypad'],
+            ['test audio', 'Untuk test audio'],
             ['test nfc', 'Untuk test nfc'],
             ['sync data', 'Sinkronisasi data ke server'],
             ['drain', 'Mengosongkan isi beras'],
@@ -785,6 +870,12 @@ class Console():
                 if cmd == "daftar":
                     self.daftar()
 
+                if cmd == "list":
+                    self.list()
+
+                if cmd == "log":
+                    self.log()
+
                 elif cmd == "test relay":
                     self.test_relay()
 
@@ -796,6 +887,12 @@ class Console():
 
                 elif cmd == "test audio":
                     self.test_audio()
+
+                elif cmd == "motor pull":
+                    self.motor_pull()
+
+                elif cmd == "motor push":
+                    self.motor_push()
 
                 elif cmd == "help" or cmd == "?":
                     self.help()
@@ -835,12 +932,8 @@ if __name__ == "__main__":
         with open(config_file_path) as config_file:
             config = json.load(config_file)
     except Exception as e:
-        print("Gagal membuka file konfigurasi (config.json)" + str(e))
+        print("Gagal membuka file konfigurasi (config.json) " + str(e))
         exit()
-
-    message = "Initializing logger..."
-    logger.debug(message)
-    print(message)
 
     log_level = {
         "NOTSET": 0,
@@ -873,11 +966,13 @@ if __name__ == "__main__":
             `uuid` varchar(50) NULL, \
             `nama` varchar(30) NOT NULL, \
             `card_id` varchar(20) NULL, \
+            `pin` varchar(4) NOT NULL DEFAULT '`1234`', \
+            `saldo` int(11) NOT NULL DEFAULT 1000, \
             `waktu_daftar` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP)");
 
         db.execute("CREATE TABLE IF NOT EXISTS `log_transaksi` ( \
             `id` INTEGER PRIMARY KEY AUTOINCREMENT, \
-            `nasabah_id` int(11) NULL, \
+            `penerima_id` int(11) NULL, \
             `jenis_transaksi` VARCHAR(30) NOT NULL, \
             `jumlah` int(11) NULL, \
             `waktu` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP)")
@@ -931,6 +1026,7 @@ if __name__ == "__main__":
 
     GPIO.setup(config["gpio_pin"]["motor_direction"], GPIO.OUT)
     GPIO.setup(config["gpio_pin"]["motor_on"], GPIO.OUT)
+    GPIO.setup(config["gpio_pin"]["sensor_pintu"], GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     # untuk relay koplak
     # GPIO.output(config["gpio_pin"]["motor_direction"], 1)
