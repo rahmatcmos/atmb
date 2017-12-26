@@ -24,6 +24,7 @@ import logging.handlers
 from pygame import mixer
 from terminaltables import AsciiTable
 import uuid
+from threading import Thread
 
 
 class Main(QtGui.QWidget, main_ui.Ui_main):
@@ -52,7 +53,7 @@ class Main(QtGui.QWidget, main_ui.Ui_main):
         logger.debug("Starting scanning NFC card...")
         self.scan_thread.start()
 
-        play_audio("backsound.ogg", -1)
+        play_audio("backsound-lirih.ogg", -1)
 
     def keypad_pressed_event(self, key):
         self.password += str(key)
@@ -147,8 +148,6 @@ class InputPin(QtGui.QWidget, input_pin_ui.Ui_Form):
         self.pin.setText(self.masked_pin)
 
         if len(self.entered_pin) == 4:
-            logger.debug("penerima ID: " + str(self.penerima[0]) + ", PIN: " + self.entered_pin)
-
             cur = db.cursor()
             cur.execute(
                 "SELECT * FROM penerima where id = ? AND pin = ?",
@@ -158,14 +157,12 @@ class InputPin(QtGui.QWidget, input_pin_ui.Ui_Form):
             cur.close()
 
             if res:
-                logger.debug("PIN OK!")
                 self.timer.stop()
                 self.keypad_thread.terminate()
                 self.menu = MainMenu(self.penerima)
                 self.close()
 
             else:
-                logger.debug("PIN FAILED!")
                 self.info.setText("PIN ANDA SALAH. SILAKAN ULANGI MASUKKAN PIN ANDA")
                 play_audio("pin_salah.ogg")
                 self.pin.setText('----')
@@ -202,11 +199,7 @@ class MainMenu(QtGui.QWidget, menu_ui.Ui_Form):
         self.timer.start(20000)
 
     def time_out(self):
-        try:
-            self.keypad_thread.terminate()
-        except Exception as e:
-            logger.error("Failed to terminate keypad thread. " + str(e))
-
+        self.keypad_thread.terminate()
         self.window = Main()
         self.close()
 
@@ -274,6 +267,8 @@ class Saldo(QtGui.QWidget, saldo_ui.Ui_Form):
         self.saldo.setText('{} LITER'.format(self.penerima[0]))
         self.showFullScreen()
 
+        play_audio(str(self.penerima[0]) + "_liter.ogg")
+
         self.timer = QtCore.QTimer()
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.time_out)
@@ -299,6 +294,9 @@ class AmbilBeras(QtGui.QWidget, ambil_beras_ui.Ui_Form):
         if self.saldo == 0:
             self.info.setText('MAAF, SISA SALDO ANDA SAAT INI ADALAH 0 LITER')
             play_audio("saldo_habis.ogg")
+
+        else:
+            play_audio("ambil_beras.ogg")
 
         self.showFullScreen()
 
@@ -454,6 +452,7 @@ class ScanThread(QtCore.QThread):
     def __init__(self):
         super(self.__class__, self).__init__()
         self.exiting = False
+        self.status_pintu = 1
 
     def __del__(self):
         self.exiting = True
@@ -462,24 +461,24 @@ class ScanThread(QtCore.QThread):
     def run(self):
         while not self.exiting:
             if not GPIO.input(config["gpio_pin"]["sensor_pintu"]):
-                self.emit(QtCore.SIGNAL('updateInfo'), "MOHON TUTUP PINTU PENGISIAN BERAS")
-                time.sleep(5)
-                data = {"id": config["id"], "status_pintu": 0, "saldo": 0}
-
-                try:
-                    r = requests.post(config["api_url"] + "atm/update", data=data, timeout=5)
-                except Exception as e:
-                    logger.debug("Failed to sync to server " + str(e))
+                # kalau tadinya statusnya tertutup, update ke server
+                if self.status_pintu == 1:
+                    self.status_pintu = 0
+                    self.emit(QtCore.SIGNAL('updateInfo'), "MOHON TUTUP PINTU PENGISIAN BERAS")
+                    time.sleep(5)
+                    data = {"id": config["id"], "status_pintu": 0, "saldo": 0}
+                    t = Thread(target=update_to_server, args=("post", config["api_url"] + "atm/update", data))
+                    t.start()
 
                 continue
 
             else:
-                data = {"id": config["id"], "status_pintu": 1, "saldo": 0}
-
-                try:
-                    r = requests.post(config["api_url"] + "atm/update", data=data, timeout=5)
-                except Exception as e:
-                    logger.debug("Failed to sync to server " + str(e))
+                # kalau tadinya statusnya terbuka, update ke server
+                if self.status_pintu == 0:
+                    self.status_pintu = 1
+                    data = {"id": config["id"], "status_pintu": 1, "saldo": 0}
+                    t = Thread(target=update_to_server, args=("post", config["api_url"] + "atm/update", data))
+                    t.start()
 
                 self.emit(QtCore.SIGNAL('updateInfo'), "TEMPELKAN KARTU ATMB ANDA...")
 
@@ -568,11 +567,8 @@ class ProsesThread(QtCore.QThread):
         db.commit()
 
         data = {"id": config["id"], "saldo": self.ambil}
-
-        try:
-            r = requests.post(config["api_url"] + 'atm/update', data=data, timeout=5)
-        except Exception as e:
-            logger.debug("Failed to sync to server. " + str(e))
+        t = Thread(target=update_to_server, args=("post", config["api_url"] + "atm/update", data))
+        t.start()
 
 
 class Proses(QtGui.QWidget, proses_ui.Ui_Form):
@@ -658,13 +654,39 @@ class Console():
             cur = db.cursor()
             cur.execute(
                 "INSERT INTO penerima (uuid, nama, saldo, pin, card_id) VALUES (?, ?, ?, ?, ?)",
-                (str(uuid.uuid4()), nama, 1000, '1234', card_id)
+                (str(uuid.uuid4()), nama, 15, '1234', card_id)
             )
             cur.close()
             db.commit()
 
             logger.info("Pendaftaran atas nama " + nama + " Berhasil!")
             print("Pendaftaran Berhasil")
+
+        except KeyboardInterrupt:
+            return
+
+    def daftar_batch(self):
+        try:
+            while True:
+                print("Tempelkan kartu ATMB...")
+                card_id = self.scan_card()
+
+                if self.card_is_registered(card_id):
+                    logger.info("Pendaftaran gagal. Kartu telah terdaftar")
+                    print("Pendaftaran gagal. Kartu telah terdaftar")
+                    time.sleep(5)
+                    continue
+
+                cur = db.cursor()
+                cur.execute(
+                    "INSERT INTO penerima (uuid, nama, saldo, pin, card_id) VALUES (?, ?, ?, ?, ?)",
+                    (str(uuid.uuid4()), card_id, 15, '1234', card_id)
+                )
+                cur.close()
+                db.commit()
+
+                print("Pendaftaran Berhasil. Angkat kartu")
+                time.sleep(5)
 
         except KeyboardInterrupt:
             return
@@ -719,16 +741,6 @@ class Console():
         except KeyboardInterrupt:
             return
 
-    def test_relay(self):
-        try:
-            print("1. Relay Motor ON/OF")
-            print("2. Relay Arah Motor maju/mundur")
-        except KeyboardInterrupt:
-            return
-
-    def test_motor(self):
-        pass
-
     def test_nfc(self):
         print("Tempelkan kartu...")
         try:
@@ -778,9 +790,20 @@ class Console():
             if confirm != "y":
                 return
 
+            GPIO.output(config["gpio_pin"]["motor_direction"], 1)
+            time.sleep(0.2)
+            GPIO.output(config["gpio_pin"]["motor_on"], 1)
+            time.sleep(config["timer_calibration"]["open"])
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
 
+            print("Mengosongkan beras. Tekan CTRL + C jika beras sudah habis")
 
-        except Exception as e:
+        except KeyboardInterrupt:
+            GPIO.output(config["gpio_pin"]["motor_direction"], 0)
+            time.sleep(0.2)
+            GPIO.output(config["gpio_pin"]["motor_on"], 1)
+            time.sleep(config["timer_calibration"]["open"])
+            GPIO.output(config["gpio_pin"]["motor_on"], 0)
             return
 
     def motor_push(self):
@@ -846,9 +869,9 @@ class Console():
             ['PERINTAH', 'KETERANGAN'],
             ['?', 'Menampilkan pesan ini'],
             ['daftar', 'Mendaftarkan kartu baru'],
+            ['daftar batch', 'Mendaftarkan kartu baru banyak'],
             ['list', 'List Penerima'],
             ['simulasi', 'Simulasi pengambilan beras untuk test mekanikal'],
-            ['test relay', 'Untuk test relay'],
             ['motor pull', 'Untuk motor pull'],
             ['motor push', 'Untuk motor push'],
             ['test keypad', 'Untuk test matix keypad'],
@@ -870,14 +893,14 @@ class Console():
                 if cmd == "daftar":
                     self.daftar()
 
+                if cmd == "daftar batch":
+                    self.daftar_batch()
+
                 if cmd == "list":
                     self.list()
 
                 if cmd == "log":
                     self.log()
-
-                elif cmd == "test relay":
-                    self.test_relay()
 
                 elif cmd == "test keypad":
                     self.test_keypad()
@@ -910,6 +933,19 @@ class Console():
         except KeyboardInterrupt:
             print("Bye")
             exit()
+
+
+def update_to_server(method, url, data=None):
+    if method == "post":
+        try:
+            r = requests.post(url, data=data, timeout=5)
+        except Exception as e:
+            logger.debug(str(e))
+    elif method == "get":
+        try:
+            r = requests.get(url, timeout=5)
+        except Exception as e:
+            logger.debug(str(e))
 
 
 def play_audio(audio_file, loops=0):
